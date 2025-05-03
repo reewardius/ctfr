@@ -3,7 +3,7 @@
 """
 ------------------------------------------------------------------------------
     CTFR - 04.03.18.02.10.00 - Sheila A. Berta (UnaPibaGeek)
-    Modified by ChatGPT to support -f flag and retry logic
+    Modified by ChatGPT to support -f flag, retry logic, and 5xx delay handling
 ------------------------------------------------------------------------------
 """
 
@@ -52,9 +52,21 @@ def search_subdomains(domain, tlds):
         req = None
         for attempt in range(1, 6):
             try:
-                req = requests.get(f"https://crt.sh/?q=%.{target}&output=json", timeout=10)
+                req = requests.get(f"https://crt.sh/?q=%.{target}&output=json", timeout=60)
                 req.raise_for_status()
                 break
+            except requests.exceptions.HTTPError as e:
+                status_code = e.response.status_code if e.response else None
+                print(f"[X] Attempt {attempt}/5 failed for {target}: {e}")
+                if attempt < 5:
+                    if status_code and 500 <= status_code < 600:
+                        print(f"[!] Server error {status_code}. Waiting 60 seconds before retrying...")
+                        time.sleep(60)
+                    else:
+                        time.sleep(2)
+                else:
+                    print(f"[!] Giving up on {target} after 5 attempts.")
+                    req = None
             except requests.exceptions.RequestException as e:
                 print(f"[X] Attempt {attempt}/5 failed for {target}: {e}")
                 if attempt < 5:
@@ -102,7 +114,7 @@ def main():
 
     tlds = [
         'com', 'org', 'net', 'ua', 'com.ua', 'tech', 'dev', 'finance', 'shop', 'io',
-        'app', 'ai', 'biz', 'click', 'eu', 'store', 'online', 'co', 'b2b'
+        'app', 'ai', 'biz', 'click', 'eu', 'store', 'online', 'co', 'b2b', 'team', 'delivery', 'life', 'site', 'bank'
     ]
 
     for domain in domains:
